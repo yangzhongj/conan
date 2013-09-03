@@ -92,6 +92,32 @@ public class MsgExecutorTest {
     }
 
     @Test
+    public void testCreate33() throws Exception {
+        DebugConsumer dc = DebugConsumer.create();
+        MsgExecutor me = MsgExecutor.create(dc, 4);
+        List<Msg> msgs = new ArrayList<Msg>();
+        for (int i = 0; i < 1000; i++) {
+            msgs.add(Msg.create().put("key" + i, "value" + i));
+        }
+        for (int i = 0; i < 1000; i++) {
+            me.handle(msgs.get(i));
+            if (i == 500) {
+                dc.setSucc(false);
+                Thread.sleep(10000);
+                dc.setSucc(true);
+            }
+        }
+        while (dc.size() != msgs.size());
+        List<Msg> handleMsgs = dc.getMsgs();
+
+        Collections.sort(msgs, new MsgComparator());
+        Collections.sort(handleMsgs, new MsgComparator());
+        for (int i = 0; i < msgs.size(); i++) {
+            assertThat(msgs.get(i), equalTo(handleMsgs.get(i)));
+        }
+    }
+
+    @Test
     public void testCreate4() throws Exception {
         DebugConsumer dc = DebugConsumer.create();
         MsgExecutor me = MsgExecutor.create(dc, 3);

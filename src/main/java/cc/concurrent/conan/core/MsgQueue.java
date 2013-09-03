@@ -155,8 +155,7 @@ public class MsgQueue {
                 totalErrorNum.incrementAndGet(); // 统计出错总数
                 if (errorFlag.get()) {
                     this.park();
-                }
-                if (errorNum.incrementAndGet() > maxErrorNum) { // 超出最大错误次数
+                } else if (errorNum.incrementAndGet() > maxErrorNum) { // 超出最大错误次数
                     if (errorFlag.compareAndSet(false, true)) { // 抢占出错监控
                         checkUntilOk();
                         errorNum.set(0);
