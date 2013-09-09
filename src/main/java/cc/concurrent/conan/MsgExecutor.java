@@ -23,7 +23,7 @@ public class MsgExecutor {
     private final static int DEFAULT_MAX_BATCH_SIZE = 1000;
     private final static int DEFAULT_MAX_ERROR_NUM = 10;
     private final static long DEFAULT_TIME_SLICE = 5000L;
-    private final static long DEFAULT_WAIT_PARK = 500L;
+    private final static long DEFAULT_WAIT_PARK = 1000L;
     private final static long DEFAULT_WAIT_CHECK = 2000L;
 
 
