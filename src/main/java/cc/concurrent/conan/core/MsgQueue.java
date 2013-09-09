@@ -9,7 +9,6 @@ import cc.concurrent.conan.util.logging.InternalLoggerFactory;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.concurrent.BlockingQueue;
-import java.util.concurrent.LinkedBlockingQueue;
 import java.util.concurrent.ThreadFactory;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicBoolean;
@@ -29,21 +28,21 @@ import static cc.concurrent.conan.util.Preconditions.checkNotNull;
  */
 public class MsgQueue {
 
-    private final BlockingQueue<Msg> workQueue = new LinkedBlockingQueue<Msg>();
+    private volatile Consumer consumer; // 消息处理逻辑
+    private final BlockingQueue<Msg> workQueue; // 处理消息的队列
+    private final int threadNum; // 处理消息的线程数
+    private final int maxBatchNum; // 最大批量取消息数
+    private final int maxBatchSize; // 最大批量取消息大小
+    private final int maxErrorNum; // 最大连续出错数
+    private final long timeSlice; // 消息队列为空时，取消息阻塞时间
+    private final long waitPark; // 检测其他线程是否挂起周期
+    private final long waitCheck; // 检测消息处理逻辑是否正常周期
+    private final ThreadFactory threadFactory; // 线程工厂
 
-    private volatile Consumer consumer; // 可以在队列运行后随时变化
-    private final int maxBatchNum;
-    private final int maxBatchSize;
-    private final int threadNum;
-
-    private final int maxErrorNum;
-    private final long timeSlice;
-    private final ThreadFactory threadFactory;
-
-    private Thread[] threads = null;
-    private AtomicInteger parkThreadNum = new AtomicInteger(0);
-    private final AtomicInteger errorNum = new AtomicInteger(0);
-    private final AtomicBoolean errorFlag = new AtomicBoolean(false);
+    private Thread[] threads = null; // 处理消息的线程
+    private final AtomicInteger parkThreadNum = new AtomicInteger(0); // 出错后，线程挂起数
+    private final AtomicInteger errorNum = new AtomicInteger(0); // 连续出错数
+    private final AtomicBoolean errorFlag = new AtomicBoolean(false); // 错误处理标志位
 
     private final AtomicLong totalErrorNum = new AtomicLong(0); // 统计出错总数
     private final AtomicLong totalMsgNum = new AtomicLong(0); // 统计处理消息总数
@@ -52,23 +51,28 @@ public class MsgQueue {
 
     private final InternalLogger logger = InternalLoggerFactory.getLogger(MsgQueue.class);
 
-    public MsgQueue(Consumer consumer, int threadNum, int maxBatchNum, int maxBatchSize,
-                    int maxErrorNum, long timeSlice, ThreadFactory threadFactory) {
-
+    public MsgQueue(Consumer consumer, BlockingQueue<Msg> workQueue, int threadNum, int maxBatchNum, int maxBatchSize,
+                    int maxErrorNum, long timeSlice, long waitPark, long waitCheck, ThreadFactory threadFactory) {
         checkNotNull(consumer, "consumer can't be null");
+        checkNotNull(workQueue, "workQueue can't be null");
         checkArgument(threadNum > 0, "threadNum must larger than zero");
         checkArgument(maxBatchNum > 0, "maxBatchNum must larger than zero");
         checkArgument(maxBatchSize > 0, "maxBatchSize must larger than zero");
         checkArgument(maxErrorNum > 0, "maxErrorNum must larger than zero");
         checkArgument(timeSlice > 0, "timeSlice must larger than zero");
+        checkArgument(waitPark > 0, "waitPark must larger than zero");
+        checkArgument(waitCheck > 0, "waitCheck must larger than zero");
         checkNotNull(threadFactory, "threadFactory can't be null");
 
         this.consumer = consumer;
+        this.workQueue = workQueue;
+        this.threadNum = threadNum;
         this.maxBatchNum = maxBatchNum;
         this.maxBatchSize = maxBatchSize;
-        this.threadNum = threadNum;
         this.maxErrorNum = maxErrorNum;
         this.timeSlice = timeSlice;
+        this.waitPark = waitPark;
+        this.waitCheck = waitCheck;
         this.threadFactory = threadFactory;
     }
 
@@ -181,14 +185,14 @@ public class MsgQueue {
         logger.error("%s error to check", Thread.currentThread().getName());
         while (parkThreadNum.get() < threadNum - 1) { // 等待其他线程park
             logger.error("%s wait other thread park", Thread.currentThread().getName());
-            LockSupport.parkNanos(this, TimeUnit.SECONDS.toNanos(1L));
+            LockSupport.parkNanos(this, TimeUnit.MILLISECONDS.toNanos(waitPark));
         }
         while (true) {
             if (consumer.check()) {
                 break;
             }
             logger.error("%s wait remote ok", Thread.currentThread().getName());
-            LockSupport.parkNanos(this, TimeUnit.SECONDS.toNanos(2L));
+            LockSupport.parkNanos(this, TimeUnit.MILLISECONDS.toNanos(waitCheck));
         }
     }
 

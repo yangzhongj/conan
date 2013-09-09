@@ -8,6 +8,7 @@ import java.util.ArrayList;
 import java.util.Collections;
 import java.util.Comparator;
 import java.util.List;
+import java.util.concurrent.ArrayBlockingQueue;
 
 import static org.hamcrest.CoreMatchers.equalTo;
 import static org.hamcrest.MatcherAssert.assertThat;
@@ -27,7 +28,7 @@ public class MsgExecutorTest {
     @Test
     public void testCreate() throws Exception {
         DebugConsumer dc = DebugConsumer.create();
-        MsgExecutor me = MsgExecutor.create(dc, 1);
+        MsgExecutor me = MsgExecutor.create(dc, new ArrayBlockingQueue<Msg>(MsgExecutor.DEFAULT_QUEUE_CAPACITY), 1);
         List<Msg> msgs = new ArrayList<Msg>();
         for (int i = 0; i < 1000; i++) {
             msgs.add(Msg.create().put("key" + i, "value" + i));
@@ -47,7 +48,7 @@ public class MsgExecutorTest {
     @Test
     public void testCreate2() throws Exception {
         DebugConsumer dc = DebugConsumer.create();
-        MsgExecutor me = MsgExecutor.create(dc, 2);
+        MsgExecutor me = MsgExecutor.create(dc, new ArrayBlockingQueue<Msg>(MsgExecutor.DEFAULT_QUEUE_CAPACITY), 2);
         List<Msg> msgs = new ArrayList<Msg>();
         for (int i = 0; i < 1000; i++) {
             msgs.add(Msg.create().put("key" + i, "value" + i));
@@ -68,7 +69,7 @@ public class MsgExecutorTest {
     @Test
     public void testCreate3() throws Exception {
         DebugConsumer dc = DebugConsumer.create();
-        MsgExecutor me = MsgExecutor.create(dc, 4);
+        MsgExecutor me = MsgExecutor.create(dc, new ArrayBlockingQueue<Msg>(MsgExecutor.DEFAULT_QUEUE_CAPACITY), 4);
         List<Msg> msgs = new ArrayList<Msg>();
         for (int i = 0; i < 1000; i++) {
             msgs.add(Msg.create().put("key" + i, "value" + i));
@@ -94,7 +95,7 @@ public class MsgExecutorTest {
     @Test
     public void testCreate33() throws Exception {
         DebugConsumer dc = DebugConsumer.create();
-        MsgExecutor me = MsgExecutor.create(dc, 4);
+        MsgExecutor me = MsgExecutor.create(dc, new ArrayBlockingQueue<Msg>(MsgExecutor.DEFAULT_QUEUE_CAPACITY), 4);
         List<Msg> msgs = new ArrayList<Msg>();
         for (int i = 0; i < 1000; i++) {
             msgs.add(Msg.create().put("key" + i, "value" + i));
@@ -120,7 +121,7 @@ public class MsgExecutorTest {
     @Test
     public void testCreate4() throws Exception {
         DebugConsumer dc = DebugConsumer.create();
-        MsgExecutor me = MsgExecutor.create(dc, 3);
+        MsgExecutor me = MsgExecutor.create(dc, new ArrayBlockingQueue<Msg>(MsgExecutor.DEFAULT_QUEUE_CAPACITY), 3);
         List<Msg> msgs = new ArrayList<Msg>();
         for (int i = 0; i < 1000; i++) {
             msgs.add(Msg.create().put("key" + i, "value" + i));
