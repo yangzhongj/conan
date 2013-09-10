@@ -1,6 +1,8 @@
 package cc.concurrent.conan;
 
 import cc.concurrent.conan.core.consumer.DebugConsumer;
+import cc.concurrent.conan.util.logging.InternalLoggerFactory;
+import cc.concurrent.conan.util.logging.Slf4jLoggerFactory;
 import org.junit.BeforeClass;
 import org.junit.Test;
 
@@ -22,7 +24,7 @@ public class MsgExecutorTest {
 
     @BeforeClass
     public static void beforeClass() {
-        //InternalLoggerFactory.setDefaultFactory(new Slf4jLoggerFactory());
+        InternalLoggerFactory.setDefaultFactory(new Slf4jLoggerFactory());
     }
 
     @Test
@@ -43,6 +45,7 @@ public class MsgExecutorTest {
             assertThat(msgs.get(i), equalTo(handleMsgs.get(i)));
         }
         assertThat(1000L, equalTo(me.snapshot().getMsgNum()));
+        me.stop();
     }
 
     @Test
@@ -64,6 +67,7 @@ public class MsgExecutorTest {
         for (int i = 0; i < msgs.size(); i++) {
             assertThat(msgs.get(i), equalTo(handleMsgs.get(i)));
         }
+        me.stop();
     }
 
     @Test
@@ -90,6 +94,7 @@ public class MsgExecutorTest {
         for (int i = 0; i < msgs.size(); i++) {
             assertThat(msgs.get(i), equalTo(handleMsgs.get(i)));
         }
+        me.stop();
     }
 
     @Test
@@ -116,6 +121,7 @@ public class MsgExecutorTest {
         for (int i = 0; i < msgs.size(); i++) {
             assertThat(msgs.get(i), equalTo(handleMsgs.get(i)));
         }
+        me.stop();
     }
 
     @Test
@@ -142,6 +148,34 @@ public class MsgExecutorTest {
         for (int i = 0; i < msgs.size(); i++) {
             assertThat(msgs.get(i), equalTo(handleMsgs.get(i)));
         }
+        me.stop();
+    }
+
+    @Test
+    public void testStop() throws Exception {
+        DebugConsumer dc = DebugConsumer.create();
+        MsgExecutor me = MsgExecutor.create(dc, new ArrayBlockingQueue<Msg>(MsgExecutor.DEFAULT_QUEUE_CAPACITY), 2);
+        List<Msg> msgs = new ArrayList<Msg>();
+        for (int i = 0; i < 1000; i++) {
+            msgs.add(Msg.create().put("key" + i, "value" + i));
+        }
+        me.stop();
+        for (Msg msg : msgs) {
+            me.handle(msg);
+        }
+        me.start();
+        for (Msg msg : msgs) {
+            me.handle(msg);
+        }
+        while (dc.size() != msgs.size());
+        List<Msg> handleMsgs = dc.getMsgs();
+
+        Collections.sort(msgs, new MsgComparator());
+        Collections.sort(handleMsgs, new MsgComparator());
+        for (int i = 0; i < msgs.size(); i++) {
+            assertThat(msgs.get(i), equalTo(handleMsgs.get(i)));
+        }
+        me.stop();
     }
 
 

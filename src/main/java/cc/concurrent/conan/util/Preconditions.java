@@ -43,5 +43,25 @@ public class Preconditions {
         }
     }
 
+    public static void checkState(boolean expression) {
+        if (!expression) {
+            throw new IllegalStateException();
+        }
+    }
+
+    public static void checkState(boolean expression, @Nullable Object errorMessage) {
+        if (!expression) {
+            throw new IllegalStateException(String.valueOf(errorMessage));
+        }
+    }
+
+    public static void checkState(boolean expression,
+                                     @Nullable String errorMessageTemplate,
+                                     @Nullable Object... errorMessageArgs) {
+        if (!expression) {
+            throw new IllegalStateException(String.format(errorMessageTemplate, errorMessageArgs));
+        }
+    }
+
 
 }

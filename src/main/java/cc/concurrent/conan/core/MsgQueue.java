@@ -19,6 +19,7 @@ import java.util.concurrent.locks.ReentrantLock;
 
 import static cc.concurrent.conan.util.Preconditions.checkArgument;
 import static cc.concurrent.conan.util.Preconditions.checkNotNull;
+import static cc.concurrent.conan.util.Preconditions.checkState;
 
 /**
  * 消息队列，生产者消费者模型
@@ -48,6 +49,7 @@ public class MsgQueue {
     private final AtomicLong totalMsgNum = new AtomicLong(0); // 统计处理消息总数
 
     private final ReentrantLock lock = new ReentrantLock();
+    private volatile State state = State.NEW;
 
     private final InternalLogger logger = InternalLoggerFactory.getLogger(MsgQueue.class);
 
@@ -79,9 +81,15 @@ public class MsgQueue {
     public void start() {
         lock.lock();
         try {
-            if (threads != null) {
-                throw new IllegalStateException("msgQueue has started");
-            }
+            checkState(state == State.NEW || state == State.STOP, "state need NEW or STOP but %s", state.toString());
+
+            parkThreadNum.set(0);
+            errorNum.set(0);
+            errorFlag.set(false);
+            totalErrorNum.set(0);
+            totalMsgNum.set(0);
+            workQueue.clear(); // 清空所有消息
+
             threads = new Thread[threadNum];
             for (int i = 0; i < threadNum; i++) {
                 threads[i] = threadFactory.newThread(new Dispatcher());
@@ -89,6 +97,34 @@ public class MsgQueue {
             for (int i = 0; i < threadNum; i++) {
                 threads[i].start();
             }
+
+            state = State.START;
+        } finally {
+            lock.unlock();
+        }
+    }
+
+    public void stop() {
+        lock.lock();
+        try {
+            checkState(state == State.START, "state need START but %s", state.toString());
+            checkNotNull(threads);
+
+            state = State.STOP;
+
+            // 中断运行中线程
+            for (int i = 0; i < threads.length; i++) {
+                threads[i].interrupt();
+            }
+
+            // 等待线程结束
+            for (int i = 0; i < threads.length; i++) {
+                threads[i].join(); // 如果在join时发生中断，则队列处于FAIL状态
+            }
+            threads = null;
+        } catch (InterruptedException e) {
+            logger.error(e.getMessage(), e);
+            state = State.FAIL;
         } finally {
             lock.unlock();
         }
@@ -98,6 +134,10 @@ public class MsgQueue {
         checkNotNull(msg, "msg can't be null");
         checkArgument(!msg.isEmpty(), "msg must have data");
         checkArgument(msg.size() <= maxBatchNum, "max one msg size is %s but %s", maxBatchNum, msg.size());
+
+        if (state != State.START) {
+            return false;
+        }
 
         if (logger.isDebugEnabled()) {
             logger.debug("add msg %s", msg);
@@ -116,7 +156,7 @@ public class MsgQueue {
     private List<Msg> batchPoll() {
         List<Msg> msgs = new ArrayList<Msg>();
         int size = 0;
-        while (true) {
+        while (!isInterrupted()) {
             try {
                 Msg msg = msgs.isEmpty() ?
                         workQueue.poll(timeSlice, TimeUnit.MILLISECONDS) :
@@ -130,8 +170,7 @@ public class MsgQueue {
                     break;
                 }
             } catch (InterruptedException ie) {
-                // 被中断
-                break;
+                Thread.currentThread().interrupt();   // 设置中断标志
             }
         }
         return msgs;
@@ -142,7 +181,7 @@ public class MsgQueue {
      */
     private void handle(List<Msg> msgs) {
         int t = 0;
-        while (true) {
+        while (!isInterrupted()) {
             t++;
             if (logger.isDebugEnabled()) {
                 logger.debug("%s handle %s times, %s msgs %s", Thread.currentThread().getName(), t, msgs.size(), msgs);
@@ -150,7 +189,7 @@ public class MsgQueue {
             if (consumer.handle(msgs)) {
                 totalMsgNum.addAndGet(msgs.size()); // 统计处理消息总数
                 if (errorFlag.get()) {
-                    this.park();
+                    park();
                 } else {
                     errorNum.set(0);
                 }
@@ -158,7 +197,7 @@ public class MsgQueue {
             } else { // 失败
                 totalErrorNum.incrementAndGet(); // 统计出错总数
                 if (errorFlag.get()) {
-                    this.park();
+                    park();
                 } else if (errorNum.incrementAndGet() > maxErrorNum) { // 超出最大错误次数
                     if (errorFlag.compareAndSet(false, true)) { // 抢占出错监控
                         checkUntilOk();
@@ -167,11 +206,11 @@ public class MsgQueue {
                         logger.error("%s unpark other thread", Thread.currentThread().getName());
                         for (int i = 0; i < threads.length; i++) {
                             if (Thread.currentThread() != threads[i]) {
-                                this.unpark(threads[i]);
+                                unpark(threads[i]);
                             }
                         }
                     } else {
-                        this.park();
+                        park();
                     }
                 }
             }
@@ -187,7 +226,7 @@ public class MsgQueue {
             logger.error("%s wait other thread park", Thread.currentThread().getName());
             LockSupport.parkNanos(this, TimeUnit.MILLISECONDS.toNanos(waitPark));
         }
-        while (true) {
+        while (!isInterrupted()) {
             if (consumer.check()) {
                 break;
             }
@@ -206,9 +245,21 @@ public class MsgQueue {
         LockSupport.unpark(thread);
     }
 
+    public Consumer getConsumer() {
+        return consumer;
+    }
+
+    public void setConsumer(Consumer consumer) {
+        this.consumer = consumer;
+    }
+
+    private static boolean isInterrupted() {
+        return Thread.currentThread().isInterrupted();
+    }
+
     private class Dispatcher implements Runnable {
         public void run() {
-            while (true) {
+            while (!isInterrupted()) {
                 List<Msg> msgs = batchPoll();
                 if (errorFlag.get()) {
                     park();
@@ -217,15 +268,12 @@ public class MsgQueue {
                     handle(msgs);
                 }
             }
+            logger.info("%s stop over", Thread.currentThread().getName());
         }
     }
 
-    public Consumer getConsumer() {
-        return consumer;
-    }
-
-    public void setConsumer(Consumer consumer) {
-        this.consumer = consumer;
+    enum State {
+        NEW, START, STOP, FAIL
     }
 
 }

@@ -38,6 +38,14 @@ public class MsgExecutor {
         return msgQueue.handle(msg);
     }
 
+    public void stop() {
+        msgQueue.stop();
+    }
+
+    public void start() {
+        msgQueue.start();
+    }
+
     public QueueStats snapshot() {
         return msgQueue.snapshot();
     }
