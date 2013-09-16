@@ -16,7 +16,7 @@ import java.util.concurrent.ThreadFactory;
 */
 public class MsgExecutor {
 
-    private volatile MsgQueue msgQueue; // 保证能初始化完全
+    private MsgQueue msgQueue; // 真正执行操作的类
 
     public final static int DEFAULT_QUEUE_CAPACITY = 1024 * 100;
     private final static int DEFAULT_MAX_BATCH_NUM = 100;

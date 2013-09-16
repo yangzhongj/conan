@@ -1,8 +1,6 @@
 package cc.concurrent.conan;
 
 import cc.concurrent.conan.core.consumer.DebugConsumer;
-import cc.concurrent.conan.util.logging.InternalLoggerFactory;
-import cc.concurrent.conan.util.logging.Slf4jLoggerFactory;
 import org.junit.BeforeClass;
 import org.junit.Test;
 
@@ -24,7 +22,7 @@ public class MsgExecutorTest {
 
     @BeforeClass
     public static void beforeClass() {
-        InternalLoggerFactory.setDefaultFactory(new Slf4jLoggerFactory());
+        //InternalLoggerFactory.setDefaultFactory(new Slf4jLoggerFactory());
     }
 
     @Test
