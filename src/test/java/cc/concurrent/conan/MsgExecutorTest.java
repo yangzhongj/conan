@@ -176,6 +176,31 @@ public class MsgExecutorTest {
         me.stop();
     }
 
+    @Test
+    public void testStopStart() throws Exception {
+        DebugConsumer dc = DebugConsumer.create();
+        int size = 100;
+        MsgExecutor me = MsgExecutor.create(dc, new ArrayBlockingQueue<Msg>(size), 2);
+        for (int i = 0; i < size; i++) {
+            boolean r = me.handle(Msg.create().put("key" + i, "value" + i));
+            assertThat(r, equalTo(true));
+        }
+        me.stop();
+        for (int i = 0; i < size; i++) {
+            boolean r = me.handle(Msg.create().put("key" + i, "value" + i));
+            assertThat(r, equalTo(false));
+        }
+        me.start();
+        for (int i = 0; i < size; i++) {
+            boolean r = me.handle(Msg.create().put("key" + i, "value" + i));
+            assertThat(r, equalTo(true));
+        }
+        me.stop();
+        for (int i = 0; i < size; i++) {
+            boolean r = me.handle(Msg.create().put("key" + i, "value" + i));
+            assertThat(r, equalTo(false));
+        }
+    }
 
     class MsgComparator implements Comparator<Msg> {
         @Override
