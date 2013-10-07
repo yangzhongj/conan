@@ -23,4 +23,4 @@ for (int i = 0; i < 5; i++) {
 Thread.sleep(1000);
 me.stop();
 ```
-上面的代码中，5个线程分别处理了100个消息，这些消息会被拼装成json字符串，发送到concurrent.cc，拼接成的url为http://concurrent.cc/log?p=json字符串，这样只需要打开nginx汇总服务的access log并记录http请求的参数，就能得到这些json字符串的消息了。
+上面的代码中，5个线程分别处理了100个消息，这些消息会被拼装成json字符串，发送到concurrent.cc，拼接成的url为`http://concurrent.cc/log?p=json字符串`，这样只需要打开nginx汇总服务的access log并记录http请求的参数，就能得到这些json字符串的消息了。
